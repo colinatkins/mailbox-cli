@@ -2,12 +2,12 @@
 
 This is an unofficial command line interface for the Mailbox.org API v1.
 Please note, this CLI is still under development and doesn't support all API methods yet.
-Please refer to (Status)[#status] to check the state of completion.
+Please refer to [Status](#status) to check the state of completion.
 
 ## Requirements
 
-This CLI requires Ruby 2.0. Please refer to [rbenv](https://github.com/rbenv/rbenv) to install Ruby on your system if you're using OSX or GNU/Linux.
-For Windows Users you can use [RubyInstaller](https://rubyinstaller.org/)
+This CLI requires Ruby 2.0+, any recent Ruby versions will be fine. Please refer to [rbenv](https://github.com/rbenv/rbenv) to install Ruby on your system if you're using OSX or GNU/Linux.
+For Windows Users you can use [RubyInstaller](https://rubyinstaller.org/).
 
 ## Installation
 
