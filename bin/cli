@@ -1,0 +1,171 @@
+#!/usr/bin/env ruby
+
+require "bundler/setup"
+require 'thor'
+require_relative '../lib/mailbox'
+
+class CLI < Thor
+  include Thor::Actions
+
+  MAIL_PREFERENCES = %w(password plan first_name last_name inboxsave forwards aliases alternate memo active title birthday position department company street postal_code city phone fax cell_phone)
+  MAIL_BOOLEANS = %w(inboxsave active)
+  MAIL_ARRAYS = %w(forwards aliases)
+  MAIL_PLANS = %w(MAIL MAILXL MAILXXL MAILXXXL Office OfficeXL OfficeXXL OfficeXXXL)
+
+  desc "auth", "Performs a login (Authentication)"
+  def auth
+    mailbox = Mailbox.new()
+    user = ask("Username:")
+    pass = ask("Password:", echo: false)
+    mailbox.auth(user, pass)
+  end
+
+  desc "deauth", "Performs a logout"
+  def deauth
+    mailbox = Mailbox.new()
+    mailbox.deauth()
+  end
+
+  desc "hello_world", "Returns the string 'Hello World!'"
+  def hello_world
+    mailbox = Mailbox.new()
+    mailbox.hello_world
+  end
+
+  desc "hello_innerworld", "Returns the string 'Hello Inner-World!' if called from a valid session"
+  def hello_innerworld
+    mailbox = Mailbox.new()
+    mailbox.hello_innerworld
+  end
+
+  desc "account_add", "Creates a new account"
+  def account_add
+    mailbox = Mailbox.new()
+
+    plans = %w(basic profi profixl reseller)
+
+    account = ask("account:")
+    password = ask("password:")
+    plan = ask("plan (#{plans.join(', ')}):")
+    memo = ask("memo:")
+
+    unless plans.include? plan
+      raise Thor::Error.new("Specify one of these plans: #{plans.join(', ')}")
+    end
+
+    mailbox.account_add(account, password, plan, memo)
+  end
+
+  desc "account_get", "Returns information about an account"
+  def account_get
+    mailbox = Mailbox.new()
+    mailbox.account_get
+  end
+
+  desc "account_list", "Returns a list of all accounts that can be administrated"
+  def account_list
+    mailbox = Mailbox.new()
+    mailbox.account_list
+  end
+
+  desc "domain_add", "Adds a domain"
+  def domain_add
+    mailbox = Mailbox.new()
+    say("*=mandatory")
+    domain, password, context_id, create_new_context_id, memo = ask("domain *:"), ask("password *:", echo: 'x'), ask("context_id:"), ask("create_new_context_id:"), ask("memo:")
+    mailbox.domain_add(domain, password, context_id, create_new_context_id, memo)
+  end
+
+  desc "domain_get DOMAIN", "Returns details about a domain"
+  def domain_get(domain)
+    mailbox = Mailbox.new()
+    mailbox.domain_get(domain)
+  end
+
+  desc "domain_list", "Returns a list of all existing domains"
+  def domain_list
+    mailbox = Mailbox.new()
+    mailbox.domain_list
+  end
+
+  desc "mail_backup_list MAIL", "Lists all existing E-Mail-backups"
+  def mail_backup_list(mail)
+    mailbox = Mailbox.new()
+    mailbox.mail_backup_list(mail)
+  end
+
+  desc "mail_blacklist_list MAIL", "Lists all blacklist entries"
+  def mail_blacklist_list(mail)
+    mailbox = Mailbox.new()
+    mailbox.mail_blacklist_list(mail)
+  end
+
+  desc "mail_del MAIL", "Deletes an e-mail address"
+  def mail_del(mail)
+    mailbox = Mailbox.new()
+    if ask("Careful! All data of the email address will be deleted!!! Really delete mail #{mail}? Enter 'YES' to proceed, press CTRL+C to cancel.") == 'YES'
+      mailbox.mail_del(mail)
+    else
+      say "Aborted"
+    end
+  end
+
+  desc "mail_list DOMAIN", "Returns a list of e-mail addresses + configuration information"
+  def mail_list(domain)
+    mailbox = Mailbox.new()
+    mailbox.mail_list(domain)
+  end
+
+  desc "mail_get MAIL", "Returns e-mail address details"
+  def mail_get(mail)
+    mailbox = Mailbox.new()
+    mailbox.mail_get(mail)
+  end
+
+  desc "mail_set MAIL PREFERENCE", "Modifies e-mail address properties"
+  def mail_set(mail, preference)
+    if preference.nil? or preference.length.zero? or !MAIL_PREFERENCES.include? preference
+      raise Thor::Error.new("Provide a preference which you want to set, either: #{MAIL_PREFERENCES.join(', ')}")
+    end
+
+
+    if MAIL_ARRAYS.include? preference
+      puts "ATTENTION: When providing array preferences: Enter all wanted values of the preference as they are overridden by what you enter. If you want to enter more than one array element split them by entering a comma, e.g. bob@example.com,anna@example.com"
+    end
+
+    value = ask("#{preference}:")
+
+    # Validate values.
+    if MAIL_BOOLEANS.include? preference
+      value = value.downcase
+      if value == "0" or value == "false"
+        value = false
+      elsif value == "1" or value == "true"
+        value = true
+      end
+    end
+
+    if MAIL_ARRAYS.include? preference
+      value = value.split(',')
+    end
+
+    if preference == 'plan'
+      unless MAIL_PLANS.include? value
+        raise Thor::Error.new("Please enter one of these plan and mind its case sensitive, either: #{MAIL_PLANS.join(', ')}")
+      end
+    end
+
+    mailbox = Mailbox.new()
+    mailbox.mail_set(mail, preference, value)
+  end
+
+  desc "mail_spamprotect_get", "Read spamprotection settings"
+  def mail_spamprotect_get
+    mailbox = Mailbox.new()
+    mail = ask("E-mail address for reading spamprotection settings?")
+    mailbox.mail_spamprotect_get(mail)
+  end
+end
+
+
+CLI.start(ARGV)
