@@ -38,7 +38,7 @@ After that you can list all commands by entering:
     
 ### Example
 
-    $ bin/cli 
+    $ bin/cli mail_add max@mustermann-maschinen.de
     
 ### Preferences
 
