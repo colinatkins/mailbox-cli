@@ -7,36 +7,19 @@ require_relative '../lib/mailbox'
 class CLI < Thor
   include Thor::Actions
 
+  ACCOUNT_PLANS = %w(basic profi profixl reseller)
+  ACCOUNT_PREFERENCES = %w(password plan memo address_payment_first_name address_payment_last_name address_payment_street address_payment_zipcode address_payment_town av_contract_accept_name)
+  DOMAIN_PREFERENCES = %w(password context_id create_new_context_id memo)
   MAIL_PREFERENCES = %w(password plan first_name last_name inboxsave forwards aliases alternate memo active title birthday position department company street postal_code city phone fax cell_phone)
   MAIL_BOOLEANS = %w(inboxsave active)
   MAIL_ARRAYS = %w(forwards aliases)
   MAIL_PLANS = %w(MAIL MAILXL MAILXXL MAILXXXL Office OfficeXL OfficeXXL OfficeXXXL)
+  LANGS = %w(de en fr)
 
-  desc "auth", "Performs a login (Authentication)"
-  def auth
-    mailbox = Mailbox.new()
-    user = ask("Username:")
-    pass = ask("Password:", echo: false)
-    mailbox.auth(user, pass)
-  end
+  SPAM_ACTIVES = %w(0 1)
+  SPAM_KILLEVELS = %w(reject route)
 
-  desc "deauth", "Performs a logout"
-  def deauth
-    mailbox = Mailbox.new()
-    mailbox.deauth()
-  end
-
-  desc "hello_world", "Returns the string 'Hello World!'"
-  def hello_world
-    mailbox = Mailbox.new()
-    mailbox.hello_world
-  end
-
-  desc "hello_innerworld", "Returns the string 'Hello Inner-World!' if called from a valid session"
-  def hello_innerworld
-    mailbox = Mailbox.new()
-    mailbox.hello_innerworld
-  end
+  VALIDATOR_TYPES = %w(hostname domain mailhost mail account pass pass2 memo user contextid name)
 
   desc "account_add", "Creates a new account"
   def account_add
@@ -56,6 +39,12 @@ class CLI < Thor
     mailbox.account_add(account, password, plan, memo)
   end
 
+  desc "account_del", "(Method not implemented yet) Deletes an existing account"
+  def account_del
+    mailbox = Mailbox.new()
+    mailbox.account_del
+  end
+
   desc "account_get", "Returns information about an account"
   def account_get
     mailbox = Mailbox.new()
@@ -68,6 +57,44 @@ class CLI < Thor
     mailbox.account_list
   end
 
+  desc "account_set PREFERENCE", "Change preferences of an account"
+  def account_set(preference)
+    if preference.nil? or preference.length.zero? or !ACCOUNT_PREFERENCES.include? preference
+      raise Thor::Error.new("Provide a preference which you want to set, either: #{ACCOUNT_PREFERENCES.join(', ')}")
+    end
+
+    value = ask("#{preference}:")
+
+    if preference == 'plan'
+      unless ACCOUNT_PLANS.include? value
+        raise Thor::Error.new("Please enter one of these plan and mind its case sensitive, either: #{ACCOUNT_PLANS.join(', ')}")
+      end
+    end
+
+    mailbox = Mailbox.new()
+    mailbox.account_set(preference, value)
+  end
+
+  desc "auth", "Performs a login (Authentication)"
+  def auth
+    mailbox = Mailbox.new()
+    user = ask("Username:")
+    pass = ask("Password:", echo: false)
+    mailbox.auth(user, pass)
+  end
+
+  desc "context_list", "Returns a list of Context-IDs and associated domains"
+  def context_list
+    mailbox = Mailbox.new
+    mailbox.context_list
+  end
+
+  desc "deauth", "Performs a logout"
+  def deauth
+    mailbox = Mailbox.new()
+    mailbox.deauth()
+  end
+
   desc "domain_add", "Adds a domain"
   def domain_add
     mailbox = Mailbox.new()
@@ -76,10 +103,36 @@ class CLI < Thor
     mailbox.domain_add(domain, password, context_id, create_new_context_id, memo)
   end
 
+  desc "domain_capabilities_set DOMAIN", "Modifies domain emails capabilities"
+  def domain_capabilities_set(domain)
+    if domain.nil? or domain.length.zero?
+      raise Thor::Error.new("Please enter a valid domain for which you want to set capabilities.")
+    end
+
+    puts "ATTENTION: When entering capabilities: Enter all wanted capabilities as they are overridden by what you enter. If you want to enter more than one array element split them by entering a comma, e.g. capabilitya,capabilityb"
+
+    capabilities = ask("capabilities:")
+
+    mailbox = Mailbox.new
+    mailbox.domain_capabilities_set(domain, capabilities)
+  end
+
   desc "domain_get DOMAIN", "Returns details about a domain"
   def domain_get(domain)
     mailbox = Mailbox.new()
     mailbox.domain_get(domain)
+  end
+
+  desc "domain_del DOMAIN", "Removes a domain from an account"
+  def domain_del(domain)
+    if domain.nil? or domain.length.zero?
+      raise Thor::Error.new("Please enter a valid domain which you want to delete.")
+    end
+
+    puts "ATTENTION: When deleting a domain you have to delete all associated emails beforehand. Otherwise deletion will fail."
+
+    mailbox = Mailbox.new
+    mailbox.domain_del(domain)
   end
 
   desc "domain_list", "Returns a list of all existing domains"
@@ -88,10 +141,179 @@ class CLI < Thor
     mailbox.domain_list
   end
 
+  desc "domain_set DOMAIN PREFERENCE", "Modifies domain properties"
+  def domain_set(domain, preference)
+    if domain.nil? or domain.length.zero?
+      raise Thor::Error.new("Please enter a valid domain for which you want to set a preference.")
+    end
+
+    if preference.nil? or preference.length.zero? or !DOMAIN_PREFERENCES.include? preference
+      raise Thor::Error.new("Provide a preference which you want to set, either: #{DOMAIN_PREFERENCES.join(', ')}")
+    end
+
+    value = ask("#{preference}:")
+
+    if preference == 'create_new_context_id'
+      if value != 'true' and value != 'false'
+        raise Thor::Error.new("Please enter a valid boolean value, true OR false.")
+      end
+    end
+
+    if preference == 'context_id' or preference == 'create_new_context_id'
+      say("Context-ID to be associated to this domain. CAUTION: If the Context-ID changes for an e-mail address that belongs to a domain, any associated Cloud office data (drive, calendar, address book) will be lost; However, the e-mail messages will be preserved.")
+      change_context_id = ask("Are you sure (yes or no)?")
+    else
+      change_context_id = nil
+    end
+
+    mailbox = Mailbox.new()
+
+    if preference == 'context_id' or preference == 'create_new_context_id'
+      if !change_context_id.nil? and change_context_id.downcase == 'yes'
+        mailbox.domain_set(domain, preference, value)
+      end
+    else
+      mailbox.domain_set(domain, preference, value)
+    end
+  end
+
+  desc "hello_innerworld", "Returns the string 'Hello Inner-World!' if called from a valid session"
+  def hello_innerworld
+    mailbox = Mailbox.new()
+    mailbox.hello_innerworld
+  end
+
+  desc "hello_world", "Returns the string 'Hello World!'"
+  def hello_world
+    mailbox = Mailbox.new()
+    mailbox.hello_world
+  end
+
+  desc "mail_add MAIL", "Adds an e-mail address"
+  def mail_add(mail)
+    if mail.nil? or mail.length.zero?
+      raise Thor::Error.new("Please enter a valid e-mail address.")
+    end
+
+    values = []
+    mandatory_preferences = []
+
+    puts "Please note: For ease of use the values (#{MAIL_PREFERENCES[6..MAIL_PREFERENCES.length].join(', ')}) are only settable with the method 'mail_set MAIL PREFERENCE'."
+
+    MAIL_PREFERENCES[0..5].each do |mandatory_preference|
+      mandatory_preferences << mandatory_preference.to_sym
+
+
+      if mandatory_preference == 'plan'
+        puts "\nPlease enter one of these plans, mind its case-sensitive: #{MAIL_PLANS.join(', ')}\n"
+      end
+
+      if MAIL_ARRAYS.include? mandatory_preference
+        puts "ATTENTION: When providing array preferences: Enter all wanted values of the preference as they are overridden by what you enter. If you want to enter more than one array element split them by entering a comma, e.g. bob@example.com,anna@example.com"
+      end
+
+      if MAIL_BOOLEANS.include? mandatory_preference
+        puts "\nEnter true or false.\n"
+      end
+
+      if mandatory_preference == 'password'
+        ask_opts = { echo: false }
+      elsif mandatory_preference == 'plan'
+        ask_opts = { default: 'MAIL' }
+      elsif mandatory_preference == 'inboxsave'
+        ask_opts = { default: 'true' }
+      else
+        ask_opts = {}
+      end
+
+      value = ask("#{mandatory_preference}:", ask_opts)
+      puts "\n"
+
+      # Validate values.
+      if MAIL_BOOLEANS.include? mandatory_preference
+        value = to_bool value
+      end
+
+      if MAIL_ARRAYS.include? mandatory_preference
+        value = value.split(',')
+      end
+
+      if mandatory_preference == 'plan'
+        unless MAIL_PLANS.include? value
+          raise Thor::Error.new("Please enter one of these plan and mind its case sensitive, either: #{MAIL_PLANS.join(', ')}")
+        end
+      end
+
+      values << value
+    end
+
+    mailbox = Mailbox.new()
+    hash = { mail: mail }
+    i=0
+
+    mandatory_preferences.each do |preference|
+      hash[preference] = values[i]
+      i = i + 1
+    end
+
+    mailbox.mail_add hash
+  end
+
+  desc "mail_backup_import MAIL", "Import an E-Mail-Backup into the users mailaccount"
+  def mail_backup_import(mail)
+    if mail.nil? or mail.length.zero?
+      raise Thor::Error.new("Please enter a valid e-mail address.")
+    end
+
+    id = ask("ID:")
+    time = ask("Time:")
+    filter = ask("Filter:", default: 'all')
+
+    if id.length.zero? or time.length.zero? or filter.length.zero?
+      raise Thor::Error.new("Please enter a valid value for id, time and filter.")
+    else
+      begin
+        id = Integer(id)
+        time = Integer(time)
+      rescue ArgumentError
+        raise Thor::Error.new("Please enter only integers (0-9) for ID and Time.")
+      end
+    end
+
+    mailbox = Mailbox.new
+    mailbox.mail_backup_import mail, id, time, filter
+  end
+
   desc "mail_backup_list MAIL", "Lists all existing E-Mail-backups"
   def mail_backup_list(mail)
     mailbox = Mailbox.new()
     mailbox.mail_backup_list(mail)
+  end
+
+  desc "mail_blacklist_add MAIL ADD_ADDRESS", "Adds an address to the blacklist"
+  def mail_blacklist_add(mail, add_address)
+    if mail.nil? or mail.length.zero?
+      raise Thor::Error.new("Please enter a valid e-mail address.")
+    end
+    if add_address.nil? or add_address.length.zero?
+      raise Thor::Error.new("Please enter a valid e-mail address which you want to blacklist.")
+    end
+
+    mailbox = Mailbox.new
+    mailbox.mail_blacklist_add(mail, add_address)
+  end
+
+  desc "mail_blacklist_del MAIL DELETE_ADDRESS", "Deletes an address from the blacklist"
+  def mail_blacklist_del(mail, delete_address)
+    if mail.nil? or mail.length.zero?
+      raise Thor::Error.new("Please enter a valid e-mail address.")
+    end
+    if delete_address.nil? or delete_address.length.zero?
+      raise Thor::Error.new("Please enter a valid e-mail address which you want to remove from blacklist.")
+    end
+
+    mailbox = Mailbox.new
+    mailbox.mail_blacklist_del(mail, delete_address)
   end
 
   desc "mail_blacklist_list MAIL", "Lists all blacklist entries"
@@ -110,16 +332,53 @@ class CLI < Thor
     end
   end
 
+  desc "mail_get MAIL", "Returns e-mail address details"
+  def mail_get(mail)
+    mailbox = Mailbox.new()
+    mailbox.mail_get(mail)
+  end
+
   desc "mail_list DOMAIN", "Returns a list of e-mail addresses + configuration information"
   def mail_list(domain)
     mailbox = Mailbox.new()
     mailbox.mail_list(domain)
   end
 
-  desc "mail_get MAIL", "Returns e-mail address details"
-  def mail_get(mail)
-    mailbox = Mailbox.new()
-    mailbox.mail_get(mail)
+  desc "mail_register TOKEN", "Adds an e-mail address (using a predefined token)"
+  def mail_register(token)
+    if token.nil? or token.length.zero?
+      raise Thor::Error.new("Provide a token")
+    end
+
+    mail = ask("Mail:")
+    password = ask("Password:", echo: false)
+    alternate_mail = ask("Alternate mail:")
+    first_name = ask("First name:")
+    last_name = ask("Last name:")
+    lang = ask("Lang:", default: 'de')
+
+    if mail.nil? or mail.length.zero?
+      raise Thor::Error.new("Please provide a mail")
+    end
+
+    if password.nil? or password.length.zero?
+      raise Thor::Error.new("Please provide a password")
+    end
+
+    if first_name.nil? or first_name.length.zero?
+      raise Thor::Error.new("Please provide a mail")
+    end
+
+    if last_name.nil? or last_name.length.zero?
+      raise Thor::Error.new("Please provide a mail")
+    end
+
+    unless LANGS.include? lang
+      raise Thor::Error.new("Please provide one of these langs: #{LANGS.join(', ')}")
+    end
+
+    mailbox = Mailbox.new
+    mailbox.mail_register token, mail, password, alternate_mail, first_name, last_name, lang
   end
 
   desc "mail_set MAIL PREFERENCE", "Modifies e-mail address properties"
@@ -127,7 +386,6 @@ class CLI < Thor
     if preference.nil? or preference.length.zero? or !MAIL_PREFERENCES.include? preference
       raise Thor::Error.new("Provide a preference which you want to set, either: #{MAIL_PREFERENCES.join(', ')}")
     end
-
 
     if MAIL_ARRAYS.include? preference
       puts "ATTENTION: When providing array preferences: Enter all wanted values of the preference as they are overridden by what you enter. If you want to enter more than one array element split them by entering a comma, e.g. bob@example.com,anna@example.com"
@@ -137,16 +395,12 @@ class CLI < Thor
 
     # Validate values.
     if MAIL_BOOLEANS.include? preference
-      value = value.downcase
-      if value == "0" or value == "false"
-        value = false
-      elsif value == "1" or value == "true"
-        value = true
-      end
+      value = to_bool value
     end
 
     if MAIL_ARRAYS.include? preference
-      value = value.split(',')
+      value = value.split(',') if value.length.positive?
+      value = []               if value.length.zero?
     end
 
     if preference == 'plan'
@@ -159,11 +413,109 @@ class CLI < Thor
     mailbox.mail_set(mail, preference, value)
   end
 
-  desc "mail_spamprotect_get", "Read spamprotection settings"
-  def mail_spamprotect_get
+  desc "mail_spamprotect_get MAIL", "Read spamprotection settings"
+  def mail_spamprotect_get(mail)
+    if mail.nil? or mail.length.zero?
+      raise Thor::Error.new("Provide a email")
+    end
     mailbox = Mailbox.new()
-    mail = ask("E-mail address for reading spamprotection settings?")
     mailbox.mail_spamprotect_get(mail)
+  end
+
+  desc "mail_spamprotect_set MAIL", "Sets the spamprotection settings"
+  def mail_spamprotect_set(mail)
+    if mail.nil? or mail.length.zero?
+      raise Thor::Error.new("Provide a email")
+    end
+
+    greylist = ask("greylist:", default: '1')
+    smtp_plausibility = ask("smtp_plausibility:", default: '1')
+    rbl = ask("rbl:", default: '1')
+    bypass_banned_checks = ask("bypass_banned_checks:", default: '0')
+    tag2level = ask("tag2level:", default: '5.5')
+    killevel = ask("killevel:", default: 'route')
+    route_to = ask("route_to:", default: 'Spam')
+
+    unless SPAM_ACTIVES.include? greylist
+      raise Thor::Error.new("Please provide a zero (0) or one (1) to activate or deactivate 'Greylisting'")
+    end
+
+    unless SPAM_ACTIVES.include? smtp_plausibility
+      raise Thor::Error.new("Please provide a zero (0) or one (1) to activate or deactivate 'SMTP plausibility check'")
+    end
+
+    unless SPAM_ACTIVES.include? rbl
+      raise Thor::Error.new("Please provide a zero (0) or one (1) to activate or deactivate 'Real-time Blacklist (RBL)'")
+    end
+
+    unless SPAM_ACTIVES.include? bypass_banned_checks
+      raise Thor::Error.new("Please provide a zero (0) or one (1) to activate or deactivate 'Executable files as attachments'")
+    end
+
+    unless SPAM_KILLEVELS.include? killevel
+      raise Thor::Error.new("Please provide a valid killevel, either of: #{SPAM_KILLEVELS.join(', ')}")
+    end
+
+    mailbox = Mailbox.new()
+    mailbox.mail_spamprotect_set(mail, greylist, smtp_plausibility, rbl, bypass_banned_checks, tag2level, killevel, route_to)
+  end
+
+  desc "search", "Searches in accounts, domains and e-mails"
+  def search
+    query = ask("query:")
+
+    if query.nil? or query.length.zero?
+      raise Thor::Error.new("Please enter a search string.")
+    end
+
+    mailbox = Mailbox.new()
+    mailbox.search query
+  end
+
+  desc "test_accountallowed", "Confirms if the account can be administrated using the current ACLs"
+  def test_accountallowed
+    mailbox = Mailbox.new
+    mailbox.test_accountallowed
+  end
+
+  desc "test_domainallowed DOMAIN", "Confirms if the domain can be administrated using the current ACLs"
+  def test_domainallowed(domain)
+    if domain.nil? or domain.length.zero?
+      raise Thor::Error.new("Provide a domain")
+    end
+    mailbox = Mailbox.new
+    mailbox.test_domainallowed(domain)
+  end
+
+  desc "utils_validator", "Performs a validation"
+  def utils_validator
+
+    value = ask("value:")
+    type = ask("type (#{VALIDATOR_TYPES.join(', ')}):")
+
+    if (value.nil? or value.length.zero?) or (type.nil? or type.length.zero?)
+      raise Thor::Error.new("Please provide a value and type.")
+    end
+
+    unless VALIDATOR_TYPES.include? type
+      raise Thor::Error.new("Please provide a valid type to test the value against, either one of: #{VALIDATOR_TYPES.join(', ')}")
+    end
+
+    mailbox = Mailbox.new
+    mailbox.utils_validator value, type
+  end
+
+
+
+  private
+
+  def to_bool(value)
+    value = value.downcase
+    if %w(1 true t).include? value
+      true
+    else
+      false
+    end
   end
 end
 

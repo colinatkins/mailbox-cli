@@ -57,22 +57,21 @@ class Mailbox
     end
   end
 
-  def hello_world
-    send_request('hello.world') do |response|
-      puts response
-    end
-  end
-
-  def hello_innerworld
-    send_request('hello.innerworld') do |response|
-      puts response
-    end
-  end
-
   def account_add(account, password, plan, memo)
     send_request('account.add', { account: account, password: password, plan: plan, memo: memo }) do |response|
       response.each do |key, value|
         puts "#{key}: #{value}"
+      end
+    end
+  end
+
+  def account_del
+    account = session_account
+    send_request('account.del', { account: account }) do |response|
+      if response.to_s == 'true'
+        puts 'Successfully deleted account.'
+      else
+        puts "Deletion failed."
       end
     end
   end
@@ -98,12 +97,34 @@ class Mailbox
 
   def account_list
     send_request('account.list') do |response|
+      account = session_account
+      puts "\nAccount preferences for #{account}"
+      response.each do |key, value|
+        puts "#{key}: #{value}"
+      end
     end
   end
 
-  def context_list(account)
-    send_request('context.list', { account: account }) do
+  def account_set(preference, value)
+    account = session_account
+    send_request('account.set', { account: account, "#{preference}": value }) do |response|
+      puts "\nAccount preference set for #{account}"
+      response.each do |key, value|
+        puts "#{key}: #{value}"
+      end
+    end
+  end
 
+  def context_list
+    account = session_account
+    send_request('context.list', { account: account }) do |response|
+
+      response.each do |key, value|
+        puts "Context-ID #{key}:"
+        value.each do |domain|
+          puts "\t#{domain}"
+        end
+      end
     end
   end
 
@@ -115,6 +136,27 @@ class Mailbox
     send_request('domain.add', params) do |response|
       response.each do |key, value|
         puts "#{key}: #{value}"
+      end
+    end
+  end
+
+  def domain_capabilities_set(domain, capabilities)
+    send_request('domain.capabilities.set', { domain: domain, capabilities: capabilities }) do |response|
+      if response.to_s == 'true'
+        puts 'Domain capabilities were set.'
+      else
+        puts "Domain capabilities weren't set."
+      end
+    end
+  end
+
+  def domain_del(domain)
+    account = session_account
+    send_request('domain.del', { account: account, domain: domain }) do |response|
+      if response.to_s == 'true'
+        puts 'Domain was deleted.'
+      else
+        puts "Domain deletion failed.."
       end
     end
   end
@@ -144,9 +186,82 @@ class Mailbox
     end
   end
 
+  def domain_set(domain, preference, value)
+    send_request('domain.set', { domain: domain, "#{preference}": value }) do |response|
+      puts "\nListing domain for #{domain}:"
+      response.each do |key, value|
+        puts "#{key}: #{value}"
+      end
+    end
+  end
+
+  def hello_innerworld
+    send_request('hello.innerworld') do |response|
+      puts response
+    end
+  end
+
+  def hello_world
+    send_request('hello.world') do |response|
+      puts response
+    end
+  end
+
+  def mail_add(hash)
+    mail, password, plan, first_name, last_name, inboxsave, forwards = hash[:mail], hash[:password], hash[:plan], hash[:first_name], hash[:last_name], hash[:inboxsave], hash[:forwards]
+    send_request('mail.add', { mail: mail, password: password, plan: plan, first_name: first_name, last_name: last_name, inboxsave: inboxsave, forwards: forwards}) do |response|
+      puts "\nCreated mail for #{mail}:"
+      response.each do |key, value|
+        if value.is_a? Hash
+          puts "\n"
+          puts "#{key}:"
+          value.each do |inner_key, inner_value|
+            puts "\t#{inner_key}: #{inner_value}"
+          end
+          puts "\n"
+        else
+          puts "#{key}: #{value}"
+        end
+      end
+    end
+  end
+
+  def mail_backup_import(mail, id, time, filter)
+    send_request('mail.backup.import', { mail: mail, id: id, time: time, filter: filter }) do |response|
+      puts "\nImport executed."
+      puts "\nListing all existing e-mail-backups:"
+      response.each do |key, value|
+        puts "#{key}: #{value}"
+      end
+    end
+  end
+
   def mail_backup_list(mail)
     send_request('mail.backup.list', { mail: mail }) do |response|
+      puts "\nListing all existing e-mail-backups:"
+      response.each do |key, value|
+        puts "#{key}: #{value}"
+      end
+    end
+  end
 
+  def mail_blacklist_add(mail, add_address)
+    send_request('mail.blacklist.add', { mail: mail, add_address: add_address }) do |response|
+      puts "\nAdded mail #{add_address} to blacklist for account #{mail}."
+      puts "\nListing blacklist entries:"
+      response.each do |key, value|
+        puts "#{key}: #{value}"
+      end
+    end
+  end
+
+  def mail_blacklist_del(mail, delete_address)
+    send_request('mail.blacklist.del', { mail: mail, delete_address: delete_address }) do |response|
+      puts "\nRemoved mail #{delete_address} from blacklist of account #{mail}."
+      puts "\nListing blacklist entries:"
+      response.each do |key, value|
+        puts "#{key}: #{value}"
+      end
     end
   end
 
@@ -169,6 +284,15 @@ class Mailbox
     end
   end
 
+  def mail_get(mail)
+    send_request('mail.get', { mail: mail }) do |response|
+      puts "\nMail info for #{mail}"
+      response.each do |key, value|
+        puts "#{key}: #{value}"
+      end
+    end
+  end
+
   def mail_list(domain)
     send_request('mail.list', { domain: domain }) do |response|
       puts "\nListing mails:"
@@ -183,11 +307,15 @@ class Mailbox
     end
   end
 
-  def mail_get(mail)
-    send_request('mail.get', { mail: mail }) do |response|
-      puts "\nMail info for #{mail}"
-      response.each do |key, value|
-        puts "#{key}: #{value}"
+  def mail_register(token, mail, password, alternate_mail, first_name, last_name, lang)
+    params = { token: token, mail: mail, password: password, first_name: first_name, last_name: last_name, lang: lang}
+    params[:alternate_mail] = alternate_mail unless alternate_mail.nil? and alternate_mail.length.zero?
+
+    send_request('mail.register', params) do |response|
+      if response.to_s == 'true'
+        puts "\nMail created."
+      else
+        puts "\nMail not created (reason unknown)."
       end
     end
   end
@@ -207,6 +335,52 @@ class Mailbox
       response.each do |key, value|
         puts "#{key}: #{value}"
       end
+    end
+  end
+
+  def mail_spamprotect_set(mail, greylist, smtp_plausibility, rbl, bypass_banned_checks, tag2level, killevel, route_to)
+    send_request('mail.spamprotect.set', { mail: mail, greylist: greylist, smtp_plausibility: smtp_plausibility, rbl: rbl, bypass_banned_checks: bypass_banned_checks, tag2level: tag2level, killevel: killevel, route_to: route_to }) do |response|
+      puts "\nMail spamprotection set for #{mail}"
+      response.each do |key, value|
+        puts "#{key}: #{value}"
+      end
+    end
+  end
+
+  def search(query)
+    send_request('search', { query: query }) do |response|
+      puts "\nSearching for term '#{query}' within accounts, domains and emails:"
+      response.each do |key, values|
+        if values.is_a? Array
+          puts "\n"
+          puts "#{key}:"
+          values.each do |value|
+            puts "\t#{value}"
+          end
+          puts "\n"
+        else
+          puts "#{key}: #{values}"
+        end
+      end
+    end
+  end
+
+  def test_accountallowed
+    account = session_account
+    send_request('test.accountallowed', { account: account }) do |response|
+      puts "Confirms if the account can be administrated using the current ACLs? #{response}"
+    end
+  end
+
+  def test_domainallowed(domain)
+    send_request('test.domainallowed', { domain: domain }) do |response|
+      puts "Confirms if the domain can be administrated using the current ACLs? #{response}"
+    end
+  end
+
+  def utils_validator(value, type)
+    send_request('utils.validator', { value: value, type: type }) do |response|
+      puts "Tested Value is valid? #{response}"
     end
   end
 
