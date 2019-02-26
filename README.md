@@ -38,7 +38,15 @@ After that you can list all commands by entering:
     
 ### Example
 
+#### Creating domain and first mail address
+
+    $ bin/cli domain_add
     $ bin/cli mail_add max@mustermann-maschinen.de
+    
+#### Setting aliases for mail address
+
+    $ bin/cli mail_set max@mustermann-maschinen.de aliases
+    $ info@mustermann-maschinen.de,office@mustermann-maschinen.de
     
 ### Preferences
 
