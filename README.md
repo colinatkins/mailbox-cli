@@ -57,7 +57,7 @@ If you are unsure about what preferences you can use when creating accounts, dom
 The following commands have been implemented:
 
 | Command                                         | Desc                  |
-| ----------------------------------------------- |:---------------------:|
+| ----------------------------------------------- | --------------------- |
 | bin/cli account_add                             | Creates a new account |
 | bin/cli account_del                             | (Method not implemented yet) Deletes an existing account |
 | bin/cli account_get                             | Returns information about an account |
