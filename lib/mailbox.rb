@@ -131,7 +131,7 @@ class Mailbox
   def domain_add(domain, password, context_id, create_new_context_id, memo)
     params = { account: session_account, domain: domain, password: password }
     params.merge!({context_id: context_id})                       if !context_id.nil? and context_id.length.positive?
-    params.merge!({create_new_context_id: create_new_context_id}) if !create_new_context_id.nil? and create_new_context_id.length.positive?
+    params.merge!({create_new_context_id: create_new_context_id}) if create_new_context_id
     params.merge!({memo: memo})                                   if !memo.nil? and memo.length.positive?
     send_request('domain.add', params) do |response|
       response.each do |key, value|

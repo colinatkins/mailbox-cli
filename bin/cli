@@ -100,7 +100,7 @@ class CLI < Thor
     mailbox = Mailbox.new()
     say("*=mandatory")
     domain, password, context_id, create_new_context_id, memo = ask("domain *:"), ask("password *:", echo: 'x'), ask("context_id:"), ask("create_new_context_id:"), ask("memo:")
-    mailbox.domain_add(domain, password, context_id, create_new_context_id, memo)
+    mailbox.domain_add(domain, password, context_id, to_bool(create_new_context_id), memo)
   end
 
   desc "domain_capabilities_set DOMAIN", "Modifies domain emails capabilities"
@@ -170,6 +170,7 @@ class CLI < Thor
 
     if preference == 'context_id' or preference == 'create_new_context_id'
       if !change_context_id.nil? and change_context_id.downcase == 'yes'
+        value = to_bool(value) if preference == 'create_new_context_id'
         mailbox.domain_set(domain, preference, value)
       end
     else
