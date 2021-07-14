@@ -13,7 +13,7 @@ class CLI < Thor
   MAIL_PREFERENCES = %w(password plan first_name last_name inboxsave forwards aliases alternate memo active title birthday position department company street postal_code city phone fax cell_phone)
   MAIL_BOOLEANS = %w(inboxsave active)
   MAIL_ARRAYS = %w(forwards aliases)
-  MAIL_PLANS = %w(MAIL MAILXL MAILXXL MAILXXXL Office OfficeXL OfficeXXL OfficeXXXL)
+  MAIL_PLANS = %w(MAIL MAILXL MAILXXL MAILXXXL Office OfficeXL OfficeXXL OfficeXXXL light standard premium)
   LANGS = %w(de en fr)
 
   SPAM_ACTIVES = %w(0 1)
